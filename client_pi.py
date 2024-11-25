@@ -19,6 +19,7 @@ async def capture_and_send(
     crop_size=256,
     crop_offset_y=0,
     compression=90,
+    rotation=0,
 ):
     uri = url
     async with websockets.connect(uri) as websocket:
@@ -63,6 +64,10 @@ async def capture_and_send(
 
             frame = Image.fromarray(frame)
             frame = frame.convert("RGB")
+
+            if rotation != 0:
+                frame = frame.rotate(rotation)
+
             frame = np.array(frame)
 
             # Crop square of crop_size in the middle with offset
@@ -154,6 +159,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--compression", type=int, default=90, help="JPEG compression quality"
     )
+    parser.add_argument(
+        "--rotation",
+        type=int,
+        default=0,
+        help="Rotation of the camera image in degrees",
+    )
 
     args = parser.parse_args()
 
@@ -167,5 +178,6 @@ if __name__ == "__main__":
             args.crop_size,
             args.crop_offset_y,
             args.compression,
+            args.rotation,
         )
     )
