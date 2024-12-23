@@ -146,7 +146,6 @@ def run_server(
     lora_path=None,
     lora_scale=1.0,
     t_index_list=None,
-    compression=30,
 ):
     stream = load_model(
         base_model_path, acceleration, lora_path, lora_scale, t_index_list
@@ -161,7 +160,6 @@ def run_server(
             preprocessing,
             negative_prompt=negative_prompt,
             guidance_scale=guidance_scale,
-            compression=compression,
         ),
         host,
         port,
