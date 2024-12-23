@@ -12,7 +12,7 @@ async def capture_and_send(
 ):
     uri = url
     async with websockets.connect(uri) as websocket:
-        cap = cv2.VideoCapture(0)  # Use 1 for continuity cam iphone
+        cap = cv2.VideoCapture(0)
         cv2.namedWindow("image", cv2.WINDOW_NORMAL)
 
         if fullscreen:
@@ -22,7 +22,7 @@ async def capture_and_send(
 
         print("Connected to server...")
 
-        # Send prompt to server as json
+        # Send prompt configuration as JSON
         await websocket.send(
             json.dumps(
                 {
@@ -37,41 +37,35 @@ async def capture_and_send(
             if not ret:
                 break
 
-            # Crop frame as square with smaller side length
+            # Crop frame as square
             h, w, _ = frame.shape
             min_side = min(h, w)
-
-            # Crop in the middle
             frame = frame[
                 h // 2 - min_side // 2 : h // 2 + min_side // 2,
                 w // 2 - min_side // 2 : w // 2 + min_side // 2,
             ]
 
-            # Reduce size
+            # Resize and convert to RGB bytes
             frame = cv2.resize(frame, (image_size, image_size))
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            # Encode frame
-            _, buffer = cv2.imencode(".jpg", frame)
-            jpg_as_text = base64.b64encode(buffer).decode("utf-8")
+            # Send raw bytes directly
+            await websocket.send(frame.tobytes())
 
-            # Send to server
-            await websocket.send(jpg_as_text)
-
-            # Receive and display image
+            # Receive raw image bytes
             response = await websocket.recv()
-            img = base64.b64decode(response)
-            npimg = np.frombuffer(img, dtype=np.uint8)
-            source = cv2.imdecode(npimg, 1)
 
-            # Flip
+            # Convert bytes directly to numpy array
+            source = np.frombuffer(response, dtype=np.uint8).reshape(512, 512, 3)
+            source = cv2.cvtColor(source, cv2.COLOR_RGB2BGR)
+
+            # Flip horizontally
             source = cv2.flip(source, 1)
 
-            # Resize
-            source = cv2.resize(
-                source, dsize=(1400, 1400), interpolation=cv2.INTER_CUBIC
-            )
+            # Resize for display
+            source = cv2.resize(source, (1400, 1400), interpolation=cv2.INTER_CUBIC)
 
-            # Rotate if angle is provided
+            # Rotate if needed
             if rotate != 0:
                 (h, w) = source.shape[:2]
                 center = (w / 2, h / 2)
@@ -83,7 +77,6 @@ async def capture_and_send(
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
-            # Wait
             await asyncio.sleep(0.0001)
 
         cap.release()

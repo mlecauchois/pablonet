@@ -73,7 +73,6 @@ async def process_image(
     preprocessing=None,
     negative_prompt="",
     guidance_scale=1.2,
-    compression=30,
 ):
     # Prepare the stream
     stream.prepare(
@@ -85,9 +84,10 @@ async def process_image(
 
     async for message in websocket:
         try:
-            message = json.loads(message)
-            new_prompt = message["prompt"]
-            new_negative_prompt = message["negative_prompt"]
+            # Check if message is JSON configuration
+            message_data = json.loads(message)
+            new_prompt = message_data["prompt"]
+            new_negative_prompt = message_data["negative_prompt"]
             stream.prepare(
                 prompt=new_prompt,
                 num_inference_steps=num_inference_steps,
@@ -95,15 +95,12 @@ async def process_image(
                 negative_prompt=new_negative_prompt,
             )
             continue
-        except:
+        except json.JSONDecodeError:
+            # Message is raw image bytes
             pass
 
-        # Decode the image
-        nparr = np.frombuffer(base64.b64decode(message), np.uint8)
-        image_size_in_bytes = nparr.nbytes
-        print(f"Image size: {image_size_in_bytes} bytes")
-
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        # Convert bytes directly to numpy array
+        img = np.frombuffer(message, dtype=np.uint8).reshape(256, 256, 3)
 
         if preprocessing == "canny":
             img = cv2.Canny(img, 100, 200)
@@ -112,9 +109,7 @@ async def process_image(
             blur_img = cv2.GaussianBlur(img, (3, 3), 0)
             canny_img = cv2.Canny(blur_img, 100, 200)
             canny_img = cv2.cvtColor(canny_img, cv2.COLOR_GRAY2BGR)
-            # Change black to blue
             canny_img[np.where((canny_img == [0, 0, 0]).all(axis=2))] = [255, 0, 0]
-            # Add
             img = cv2.addWeighted(img, 0.8, canny_img, 0.2, 0)
         elif preprocessing == "blur":
             img = cv2.GaussianBlur(img, (5, 5), 0)
@@ -127,27 +122,15 @@ async def process_image(
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
         # Convert to PIL
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = PIL.Image.fromarray(img)
 
-        start = time.time()
+        # Process through diffusion model
         x_output = stream(img)
         output = postprocess_image(x_output, output_type="pil")[0]
-        print(f"Time: {time.time() - start}")
 
-        # Convert pil to numpy array
-        output = np.array(output)
-        output = cv2.cvtColor(output, cv2.COLOR_BGR2RGB)
-
-        # Encode and send back
-        compression_params = [int(cv2.IMWRITE_JPEG_QUALITY), compression]
-        _, buffer = cv2.imencode(".jpg", output, compression_params)
-        jpg_as_text = base64.b64encode(buffer).decode("utf-8")
-
-        # Calculate the size of the image
-        output_size_in_bytes = len(jpg_as_text)
-        print(f"Output size: {output_size_in_bytes} bytes")
-        await websocket.send(jpg_as_text)
+        # Convert to numpy array and send raw bytes
+        output_array = np.array(output)
+        await websocket.send(output_array.tobytes())
 
 
 def run_server(
