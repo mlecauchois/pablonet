@@ -1,13 +1,14 @@
 import asyncio
 import websockets
-import base64
 import numpy as np
-from PIL import Image, ImageTk
+from PIL import Image
 import tkinter as tk
 import json
 import io
 import cv2
 from picamera2 import Picamera2
+
+# Removed base64 import as it's no longer needed
 
 
 async def capture_and_send(
@@ -85,47 +86,59 @@ async def capture_and_send(
 
             # Encode frame
             compression_params = [int(cv2.IMWRITE_JPEG_QUALITY), compression]
-            _, buffer = cv2.imencode(".jpg", frame, compression_params)
-            jpg_as_text = base64.b64encode(buffer).decode("utf-8")
+            result, buffer = cv2.imencode(".jpg", frame, compression_params)
+            if not result:
+                print("Failed to encode image")
+                continue
 
-            # Send to server
-            await websocket.send(jpg_as_text)
+            # Convert to bytes (Removed Base64 encoding)
+            jpeg_bytes = buffer.tobytes()
+
+            # Send to server (Send raw bytes instead of Base64 string)
+            await websocket.send(jpeg_bytes)
 
             # Receive and display image
             response = await websocket.recv()
-            img = base64.b64decode(response)
-            npimg = np.frombuffer(img, dtype=np.uint8)
-            source = cv2.imdecode(npimg, 1)
 
-            # Flip
-            source = cv2.flip(source, 1)
+            # Process received data as bytes (Removed Base64 decoding)
+            if isinstance(response, bytes):
+                npimg = np.frombuffer(response, dtype=np.uint8)
+                source = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+                if source is None:
+                    print("Failed to decode received image")
+                    continue
 
-            # Crop to screen aspect ratio and resize
-            aspect_ratio = screen_width / screen_height
-            source_aspect_ratio = source.shape[1] / source.shape[0]
+                # Flip horizontally
+                source = cv2.flip(source, 1)
 
-            if source_aspect_ratio > aspect_ratio:
-                # Crop width
-                crop_width = int(source.shape[0] * aspect_ratio)
-                crop_offset = (source.shape[1] - crop_width) // 2
-                source = source[:, crop_offset : crop_offset + crop_width]
+                # Crop to screen aspect ratio and resize
+                aspect_ratio = screen_width / screen_height
+                source_aspect_ratio = source.shape[1] / source.shape[0]
+
+                if source_aspect_ratio > aspect_ratio:
+                    # Crop width
+                    crop_width = int(source.shape[0] * aspect_ratio)
+                    crop_offset = (source.shape[1] - crop_width) // 2
+                    source = source[:, crop_offset : crop_offset + crop_width]
+                else:
+                    # Crop height
+                    crop_height = int(source.shape[1] / aspect_ratio)
+                    crop_offset = (source.shape[0] - crop_height) // 2
+                    source = source[crop_offset : crop_offset + crop_height, :]
+                source = cv2.resize(
+                    source,
+                    dsize=(screen_width, screen_height),
+                    interpolation=cv2.INTER_CUBIC,
+                )
+
+                cv2.imshow("image", source)
             else:
-                # Crop height
-                crop_height = int(source.shape[1] / aspect_ratio)
-                crop_offset = (source.shape[0] - crop_height) // 2
-                source = source[crop_offset : crop_offset + crop_height, :]
-            source = cv2.resize(
-                source,
-                dsize=(screen_width, screen_height),
-                interpolation=cv2.INTER_CUBIC,
-            )
-
-            cv2.imshow("image", source)
+                print("Received non-bytes message from server")
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
-            # Wait
+            # Minimal sleep to yield control
             await asyncio.sleep(0.0001)
 
         cv2.destroyAllWindows()
@@ -135,8 +148,12 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", type=str, help="URL of server", default="")
-    parser.add_argument("--prompt", type=str, help="Prompt to send to server")
+    parser.add_argument(
+        "--url", type=str, help="URL of server", default="ws://localhost:5678"
+    )
+    parser.add_argument(
+        "--prompt", type=str, help="Prompt to send to server", required=True
+    )
     parser.add_argument(
         "--negative_prompt",
         type=str,
