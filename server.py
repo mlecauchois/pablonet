@@ -1,11 +1,8 @@
 import fire
 import cv2
 import numpy as np
-import time
 import asyncio
 import websockets
-import cv2
-import numpy as np
 import base64
 import json
 
@@ -15,7 +12,6 @@ from diffusers import AutoencoderTiny, StableDiffusionPipeline
 from streamdiffusion import StreamDiffusion
 from streamdiffusion.image_utils import postprocess_image
 from streamdiffusion.acceleration.tensorrt import accelerate_with_tensorrt
-
 
 import PIL.Image
 
@@ -73,6 +69,7 @@ async def process_image(
     preprocessing=None,
     negative_prompt="",
     guidance_scale=1.2,
+    jpeg_quality=90,
 ):
     # Prepare the stream
     stream.prepare(
@@ -105,13 +102,12 @@ async def process_image(
 
         elif isinstance(message, bytes):
             try:
-                # Assume the message is image bytes
-                img = np.frombuffer(message, dtype=np.uint8)
-                # Ensure the buffer has the correct size
-                if img.size != 256 * 256 * 3:
-                    print(f"Unexpected image size: {img.size}")
-                    continue  # Skip processing if size is incorrect
-                img = img.reshape(256, 256, 3)
+                # Decode JPEG bytes to image
+                decimg = np.frombuffer(message, dtype=np.uint8)
+                img = cv2.imdecode(decimg, cv2.IMREAD_COLOR)
+                if img is None:
+                    print("Failed to decode received JPEG image")
+                    continue
 
                 # Apply preprocessing if specified
                 if preprocessing == "canny":
@@ -138,15 +134,25 @@ async def process_image(
                     img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
                 # Convert to PIL
-                img = PIL.Image.fromarray(img)
+                img_pil = PIL.Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 
                 # Process through diffusion model
-                x_output = stream(img)
+                x_output = stream(img_pil)
                 output = postprocess_image(x_output, output_type="pil")[0]
 
-                # Convert to numpy array and send raw bytes
+                # Convert to numpy array
                 output_array = np.array(output)
-                await websocket.send(output_array.tobytes())
+                # Encode output image to JPEG
+                encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality]
+                output_bgr = cv2.cvtColor(output_array, cv2.COLOR_RGB2BGR)
+                result, encimg = cv2.imencode(".jpg", output_bgr, encode_param)
+                if not result:
+                    print("Failed to encode output image")
+                    continue
+                jpeg_bytes = encimg.tobytes()
+
+                # Send JPEG bytes back to client
+                await websocket.send(jpeg_bytes)
 
             except Exception as e:
                 print(f"Error processing image: {e}")
@@ -171,6 +177,7 @@ def run_server(
     lora_path=None,
     lora_scale=1.0,
     t_index_list=None,
+    jpeg_quality=90,
 ):
     stream = load_model(
         base_model_path, acceleration, lora_path, lora_scale, t_index_list
@@ -185,12 +192,14 @@ def run_server(
             preprocessing,
             negative_prompt=negative_prompt,
             guidance_scale=guidance_scale,
+            jpeg_quality=jpeg_quality,
         ),
         host,
         port,
     )
 
     asyncio.get_event_loop().run_until_complete(start_server)
+    print(f"Server started at ws://{host}:{port}")
     asyncio.get_event_loop().run_forever()
 
 

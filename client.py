@@ -1,14 +1,18 @@
 import asyncio
 import websockets
 import cv2
-import base64
 import numpy as np
-import PIL.Image
 import json
 
 
 async def capture_and_send(
-    url, prompt, negative_prompt, image_size=256, rotate=0, fullscreen=False
+    url,
+    prompt,
+    negative_prompt,
+    image_size=256,
+    rotate=0,
+    fullscreen=False,
+    jpeg_quality=90,
 ):
     uri = url
     async with websockets.connect(uri) as websocket:
@@ -45,34 +49,51 @@ async def capture_and_send(
                 w // 2 - min_side // 2 : w // 2 + min_side // 2,
             ]
 
-            # Resize and convert to RGB bytes
+            # Resize and convert to RGB
             frame = cv2.resize(frame, (image_size, image_size))
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            # Send raw bytes directly
-            await websocket.send(frame.tobytes())
+            # Encode frame to JPEG
+            encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality]
+            result, encimg = cv2.imencode(".jpg", frame, encode_param)
+            if not result:
+                print("Failed to encode image")
+                continue
+            jpeg_bytes = encimg.tobytes()
 
-            # Receive raw image bytes
+            # Send JPEG bytes
+            await websocket.send(jpeg_bytes)
+
+            # Receive JPEG bytes from server
             response = await websocket.recv()
 
-            # Convert bytes directly to numpy array
-            source = np.frombuffer(response, dtype=np.uint8).reshape(512, 512, 3)
-            source = cv2.cvtColor(source, cv2.COLOR_RGB2BGR)
+            # Decode JPEG bytes to image
+            if isinstance(response, bytes):
+                decimg = np.frombuffer(response, dtype=np.uint8)
+                frame_decoded = cv2.imdecode(decimg, cv2.IMREAD_COLOR)
+                if frame_decoded is None:
+                    print("Failed to decode received image")
+                    continue
 
-            # Flip horizontally
-            source = cv2.flip(source, 1)
+                # Flip horizontally
+                frame_decoded = cv2.flip(frame_decoded, 1)
 
-            # Resize for display
-            source = cv2.resize(source, (1400, 1400), interpolation=cv2.INTER_CUBIC)
+                # Resize for display
+                frame_decoded = cv2.resize(
+                    frame_decoded, (1400, 1400), interpolation=cv2.INTER_CUBIC
+                )
 
-            # Rotate if needed
-            if rotate != 0:
-                (h, w) = source.shape[:2]
-                center = (w / 2, h / 2)
-                M = cv2.getRotationMatrix2D(center, rotate, 1.0)
-                source = cv2.warpAffine(source, M, (w, h))
+                # Rotate if needed
+                if rotate != 0:
+                    (h_dec, w_dec) = frame_decoded.shape[:2]
+                    center = (w_dec / 2, h_dec / 2)
+                    M = cv2.getRotationMatrix2D(center, rotate, 1.0)
+                    frame_decoded = cv2.warpAffine(frame_decoded, M, (w_dec, h_dec))
 
-            cv2.imshow("image", source)
+                cv2.imshow("image", frame_decoded)
+
+            else:
+                print("Received non-bytes message from server")
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
@@ -89,8 +110,12 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", type=str, help="URL of server", default="")
-    parser.add_argument("--prompt", type=str, help="Prompt to send to server")
+    parser.add_argument(
+        "--url", type=str, help="URL of server", default="ws://localhost:5678"
+    )
+    parser.add_argument(
+        "--prompt", type=str, help="Prompt to send to server", required=True
+    )
     parser.add_argument(
         "--negative_prompt",
         type=str,
@@ -104,6 +129,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--fullscreen", action="store_true", help="Display window in fullscreen mode"
     )
+    parser.add_argument(
+        "--jpeg_quality", type=int, default=90, help="JPEG compression quality (1-100)"
+    )
     args = parser.parse_args()
 
     asyncio.get_event_loop().run_until_complete(
@@ -114,5 +142,6 @@ if __name__ == "__main__":
             args.image_size,
             args.rotate,
             args.fullscreen,
+            args.jpeg_quality,
         )
     )
