@@ -3,6 +3,7 @@ import websockets
 import cv2
 import numpy as np
 import json
+import time
 
 
 async def capture_and_send(
@@ -16,9 +17,11 @@ async def capture_and_send(
 ):
     uri = url
     async with websockets.connect(uri) as websocket:
-        cap = cv2.VideoCapture(0)
-        cv2.namedWindow("image", cv2.WINDOW_NORMAL)
+        t_start = time.time()
+        cap = cv2.VideoCapture(1)
+        print(f"Camera init time: {time.time() - t_start:.4f}")
 
+        cv2.namedWindow("image", cv2.WINDOW_NORMAL)
         if fullscreen:
             cv2.setWindowProperty(
                 "image", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN
@@ -36,38 +39,57 @@ async def capture_and_send(
             )
         )
 
+        frame_count = 0
         while True:
+            loop_start = time.time()
+
+            # Capture frame
+            t_start = time.time()
             ret, frame = cap.read()
+            capture_time = time.time() - t_start
+
             if not ret:
                 break
 
-            # Crop frame as square
+            # Crop frame
+            t_start = time.time()
             h, w, _ = frame.shape
             min_side = min(h, w)
             frame = frame[
                 h // 2 - min_side // 2 : h // 2 + min_side // 2,
                 w // 2 - min_side // 2 : w // 2 + min_side // 2,
             ]
+            crop_time = time.time() - t_start
 
-            # Resize and convert to RGB
+            # Resize and convert
+            t_start = time.time()
             frame = cv2.resize(frame, (image_size, image_size))
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            resize_convert_time = time.time() - t_start
 
-            # Encode frame to JPEG
+            # Encode frame
+            t_start = time.time()
             encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality]
             result, encimg = cv2.imencode(".jpg", frame, encode_param)
+            encode_time = time.time() - t_start
+
             if not result:
                 print("Failed to encode image")
                 continue
+
+            # Network send
+            t_start = time.time()
             jpeg_bytes = encimg.tobytes()
-
-            # Send JPEG bytes
             await websocket.send(jpeg_bytes)
+            send_time = time.time() - t_start
 
-            # Receive JPEG bytes from server
+            # Network receive
+            t_start = time.time()
             response = await websocket.recv()
+            receive_time = time.time() - t_start
 
-            # Decode JPEG bytes to image
+            # Process and display
+            t_start = time.time()
             if isinstance(response, bytes):
                 decimg = np.frombuffer(response, dtype=np.uint8)
                 frame_decoded = cv2.imdecode(decimg, cv2.IMREAD_COLOR)
@@ -75,15 +97,11 @@ async def capture_and_send(
                     print("Failed to decode received image")
                     continue
 
-                # Flip horizontally
                 frame_decoded = cv2.flip(frame_decoded, 1)
-
-                # Resize for display
                 frame_decoded = cv2.resize(
                     frame_decoded, (1400, 1400), interpolation=cv2.INTER_CUBIC
                 )
 
-                # Rotate if needed
                 if rotate != 0:
                     (h_dec, w_dec) = frame_decoded.shape[:2]
                     center = (w_dec / 2, h_dec / 2)
@@ -91,9 +109,26 @@ async def capture_and_send(
                     frame_decoded = cv2.warpAffine(frame_decoded, M, (w_dec, h_dec))
 
                 cv2.imshow("image", frame_decoded)
-
             else:
                 print("Received non-bytes message from server")
+            process_display_time = time.time() - t_start
+
+            total_loop_time = time.time() - loop_start
+
+            # Print timing every 30 frames
+            frame_count += 1
+            if frame_count % 10 == 0:
+                print("\nTiming breakdown (seconds):")
+                print(f"Capture: {capture_time:.4f}")
+                print(f"Crop: {crop_time:.4f}")
+                print(f"Resize & Convert: {resize_convert_time:.4f}")
+                print(f"Encode: {encode_time:.4f}")
+                print(f"Send: {send_time:.4f}")
+                print(f"Receive: {receive_time:.4f}")
+                print(f"Process & Display: {process_display_time:.4f}")
+                print(f"Total loop time: {total_loop_time:.4f}")
+                print(f"FPS: {1/total_loop_time:.2f}")
+                print("-" * 40)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
@@ -103,8 +138,6 @@ async def capture_and_send(
         cap.release()
         cv2.destroyAllWindows()
 
-
-# Command args cli
 
 if __name__ == "__main__":
     import argparse
