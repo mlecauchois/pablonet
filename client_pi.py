@@ -20,6 +20,7 @@ async def capture_and_send(
     crop_offset_y=0,
     compression=90,
     rotation=0,
+    target_fps=30,
 ):
     uri = url
     async with websockets.connect(uri) as websocket:
@@ -63,7 +64,14 @@ async def capture_and_send(
             )
         )
 
+        # Initialize frame management variables
         frame_count = 0
+        last_send_time = 0
+        min_frame_interval = 1 / target_fps
+        last_stats_time = time.time()
+        frames_since_stats = 0
+        last_displayed_frame = None
+
         while True:
             loop_start = time.time()
 
@@ -71,6 +79,16 @@ async def capture_and_send(
             t_start = time.time()
             frame = picam2.capture_array()
             capture_time = time.time() - t_start
+
+            # Check if we should process this frame based on target FPS
+            current_time = time.time()
+            if current_time - last_send_time < min_frame_interval:
+                # If we have a previous frame, display it to maintain smooth output
+                if last_displayed_frame is not None:
+                    cv2.imshow("image", last_displayed_frame)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
+                continue
 
             t_start = time.time()
             h, w, _ = frame.shape
@@ -120,50 +138,68 @@ async def capture_and_send(
             t_start = time.time()
             jpeg_bytes = buffer.tobytes()
             await websocket.send(jpeg_bytes)
+            last_send_time = current_time
             send_time = time.time() - t_start
 
-            # Receive and display image
+            # Network receive with timeout
             t_start = time.time()
-            response = await websocket.recv()
-            receive_time = time.time() - t_start
-
-            # Process received data
-            t_start = time.time()
-            if isinstance(response, bytes):
-                npimg = np.frombuffer(response, dtype=np.uint8)
-                source = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
-                if source is None:
-                    print("Failed to decode received image")
-                    continue
-
-                source = cv2.flip(source, 1)
-
-                # Crop to screen aspect ratio and resize
-                aspect_ratio = screen_width / screen_height
-                source_aspect_ratio = source.shape[1] / source.shape[0]
-
-                if source_aspect_ratio > aspect_ratio:
-                    crop_width = int(source.shape[0] * aspect_ratio)
-                    crop_offset = (source.shape[1] - crop_width) // 2
-                    source = source[:, crop_offset : crop_offset + crop_width]
-                else:
-                    crop_height = int(source.shape[1] / aspect_ratio)
-                    crop_offset = (source.shape[0] - crop_height) // 2
-                    source = source[crop_offset : crop_offset + crop_height, :]
-
-                source = cv2.resize(
-                    source,
-                    dsize=(screen_width, screen_height),
-                    interpolation=cv2.INTER_CUBIC,
+            try:
+                response = await asyncio.wait_for(
+                    websocket.recv(), timeout=1 / target_fps
                 )
+                receive_time = time.time() - t_start
 
-                cv2.imshow("image", source)
-            process_display_time = time.time() - t_start
+                # Process received data
+                t_start = time.time()
+                if isinstance(response, bytes):
+                    npimg = np.frombuffer(response, dtype=np.uint8)
+                    source = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+                    if source is None:
+                        print("Failed to decode received image")
+                        continue
+
+                    source = cv2.flip(source, 1)
+
+                    # Crop to screen aspect ratio and resize
+                    aspect_ratio = screen_width / screen_height
+                    source_aspect_ratio = source.shape[1] / source.shape[0]
+
+                    if source_aspect_ratio > aspect_ratio:
+                        crop_width = int(source.shape[0] * aspect_ratio)
+                        crop_offset = (source.shape[1] - crop_width) // 2
+                        source = source[:, crop_offset : crop_offset + crop_width]
+                    else:
+                        crop_height = int(source.shape[1] / aspect_ratio)
+                        crop_offset = (source.shape[0] - crop_height) // 2
+                        source = source[crop_offset : crop_offset + crop_height, :]
+
+                    source = cv2.resize(
+                        source,
+                        dsize=(screen_width, screen_height),
+                        interpolation=cv2.INTER_CUBIC,
+                    )
+
+                    cv2.imshow("image", source)
+                    last_displayed_frame = source
+                process_display_time = time.time() - t_start
+
+            except asyncio.TimeoutError:
+                receive_time = time.time() - t_start
+                print("Server response timeout - skipping frame")
+                # Display last frame if available
+                if last_displayed_frame is not None:
+                    cv2.imshow("image", last_displayed_frame)
+                continue
 
             total_loop_time = time.time() - loop_start
 
-            frame_count += 1
-            if frame_count % 30 == 0:  # Print timing every 30 frames
+            # Update statistics
+            frames_since_stats += 1
+            current_time = time.time()
+            stats_interval = current_time - last_stats_time
+
+            # Print timing every 30 frames or every second, whichever comes first
+            if frames_since_stats >= 30 or stats_interval >= 1.0:
                 print("\nTiming breakdown (seconds):")
                 print(f"Capture: {capture_time:.4f}")
                 print(f"PIL convert: {pil_convert_time:.4f}")
@@ -176,13 +212,17 @@ async def capture_and_send(
                 print(f"Receive: {receive_time:.4f}")
                 print(f"Process & Display: {process_display_time:.4f}")
                 print(f"Total loop time: {total_loop_time:.4f}")
-                print(f"FPS: {1/total_loop_time:.2f}")
+                print(f"Actual FPS: {frames_since_stats/stats_interval:.2f}")
                 print("-" * 40)
+
+                # Reset statistics
+                frames_since_stats = 0
+                last_stats_time = current_time
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
-            await asyncio.sleep(0.0001)
+            await asyncio.sleep(0.001)  # Small sleep to prevent CPU overload
 
         cv2.destroyAllWindows()
 
@@ -225,6 +265,9 @@ if __name__ == "__main__":
         default=0,
         help="Rotation of the camera image in degrees",
     )
+    parser.add_argument(
+        "--target_fps", type=int, default=30, help="Target FPS for frame capture"
+    )
 
     args = parser.parse_args()
 
@@ -239,5 +282,6 @@ if __name__ == "__main__":
             args.crop_offset_y,
             args.compression,
             args.rotation,
+            args.target_fps,
         )
     )
