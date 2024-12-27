@@ -46,9 +46,9 @@ I released a simple Docker image containing all the required packages and code: 
 Here are the steps to setup a server on RunPod specifically, which should be doable in under 10 minutes.
 
 - Create a persistent storage volume in order to cache the TensorRT engine, which is GPU-specific.
-- Create a new pod with:
+- Create a new pod with the following template (I also created a public template [here](https://runpod.io/console/deploy?template=d3d1n13nhd&ref=hftrdy9e)):
     - GPU: RTX 4090 (recommended).
-    - Volume: Mount your persistent storage at `/workspace/tensorrt_engines`.
+    - Volume: Mount your persistent storage at `/pablonet/engines`.
     - Docker Image: [matthieulc/pablonet:latest](https://hub.docker.com/r/matthieulc/pablonet).
     - Exposed Ports: 22 for SSH and 6000 for the backend.
     - Add your SSH public key to access the server.
@@ -58,19 +58,20 @@ ssh -p <pod_ssh_port> root@ssh.runpod.io
 ```
 - Activate the virtual environment:
 ```bash
-source venv/bin/activate
+source /pablonet/venv/bin/activate
 ```
 - Launch the server with the default parameters, which should then be accessible at `ws://IP:6000`:
 ```bash
-python pablonet/server.py --base_model_path "Lykon/DreamShaper" \
-                          --acceleration "tensorrt" \
-                          --prompt "" \
-                          --num_inference_steps 30 \
-                          --guidance_scale 1.0 \
-                          --t_index_list "[14,18]" \
-                          --preprocessing canny_blur_shift \
-                          --jpeg_quality 80 \
-                          --port 6000
+python /pablonet/server.py --base_model_path "Lykon/DreamShaper" \
+                           --acceleration "tensorrt" \
+                           --prompt "" \
+                           --num_inference_steps 30 \
+                           --guidance_scale 1.0 \
+                           --t_index_list "[14,18]" \
+                           --preprocessing canny_blur_shift \
+                           --jpeg_quality 80 \
+                           --port 6000 \
+                           --engines_dir "/pablonet/engines"
 ```
 
 Note: The container's entrypoint script handles SSH setup and environment configuration automatically.

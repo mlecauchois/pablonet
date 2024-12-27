@@ -13,9 +13,13 @@ from streamdiffusion.image_utils import postprocess_image
 from streamdiffusion.acceleration.tensorrt import accelerate_with_tensorrt
 
 
-# Rest of the code remains the same...
 def load_model(
-    base_model_path, acceleration, lora_path=None, lora_scale=1.0, t_index_list=None
+    base_model_path,
+    acceleration,
+    lora_path=None,
+    lora_scale=1.0,
+    t_index_list=None,
+    engines_dir="engines",
 ):
     t_start = time.time()
     pipe = StableDiffusionPipeline.from_pretrained(base_model_path).to(
@@ -57,7 +61,7 @@ def load_model(
     if acceleration == "tensorrt":
         stream = accelerate_with_tensorrt(
             stream,
-            "engines",
+            engines_dir,
             max_batch_size=2,
         )
     else:
@@ -221,11 +225,12 @@ def run_server(
     lora_scale=1.0,
     t_index_list=None,
     jpeg_quality=90,
+    engines_dir="engines",
 ):
     print("Loading model...")
     t_start = time.time()
     stream = load_model(
-        base_model_path, acceleration, lora_path, lora_scale, t_index_list
+        base_model_path, acceleration, lora_path, lora_scale, t_index_list, engines_dir
     )
     print(f"Total model load time: {time.time() - t_start:.4f}s")
 

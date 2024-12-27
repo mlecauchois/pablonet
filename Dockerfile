@@ -7,7 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV SHELL=/bin/bash
 
 # Define working directory
-WORKDIR /
+WORKDIR /pablonet
 
 # Remove existing SSH host keys
 RUN rm -f /etc/ssh/ssh_host_*
