@@ -35,15 +35,15 @@ ping google.com
 
 ### GPU server setup
 
-Currently, the device is not able to do inference. We use a non-distilled Stable Diffusion under the hood which would not be able to run on a Pi. Until we distill the model and add a Jetson to future devices, it is necessary to setup a remote GPU server.
+Currently, the device is not able to do inference. I use a non-distilled Stable Diffusion under the hood which would not be able to run on a Pi. Until the model is distilled and a Jetson is added to future devices, it is necessary to setup a remote GPU server.
 
 **Custom Deployment**
 
-We released a Docker image containing all the required packages and code: [matthieulc/pablonet:latest](https://hub.docker.com/r/matthieulc/pablonet). You can use the container serving service of your choice.
+I released a simple Docker image containing all the required packages and code: [matthieulc/pablonet:latest](https://hub.docker.com/r/matthieulc/pablonet). You can use the container serving service of your choice.
 
 **RunPod Deployment**
 
-Here, we detail the steps to setup a server on RunPod specifically, which should be doable in under 10 minutes.
+Here are the steps to setup a server on RunPod specifically, which should be doable in under 10 minutes.
 
 - Create a persistent storage volume in order to cache the TensorRT engine, which is GPU-specific.
 - Create a new pod with:
@@ -122,31 +122,45 @@ Since the current device does not run inference, it is very minimal. The main th
 ### Part list
 
 Purchased parts:
-- [Raspberry Pi Zero 2 W]()
+- [Raspberry Pi Zero 2 W](https://www.amazon.fr/dp/B09KLVX4RT)
 - [10.1" Pi screen](https://www.amazon.fr/HMTECH-Raspberry-Moniteur-portable-Raspbian/dp/B098762GVK)
 - [Black frame with enough depth to fit the electronics](https://www.leroymerlin.fr/produits/decoration-eclairage/decoration-murale/cadre-photo/cadre-noir/cadre-milo-21-x-29-7-cm-noir-inspire-71670942.html)
-- [Infrared Pi camera](https://www.raspberrypi.com/products/pi-noir-camera-v2/)
-- [Infrared light for in-the-dark visuals](https://www.amazon.fr/dp/B0BG5HM2Q8?ref=ppx_yo2ov_dt_b_fed_asin_title)
+- [Infrared Pi camera for in-the-dark visuals](https://www.raspberrypi.com/products/pi-noir-camera-v2/)
+- [Infrared light for in-the-dark visuals](https://www.amazon.fr/dp/B0BG5HM2Q8)
+- [WiFi dongle](https://www.amazon.fr/dp/B008IFXQFU)
+- [USB to Micro USB adapter for WiFi dongle](https://www.amazon.fr/dp/B09CV12BBZ)
+- [Thin HDMI-HDMI cable](https://www.amazon.fr/dp/B09LS9LS24)
+- [HDMI to mini HDMI adapter](https://www.amazon.fr/dp/B00ESXN4IK)
+- [Micro USB Y splitter](https://www.amazon.fr/dp/B08T7MCMWT)
+- [2m USB extension cord](https://www.amazon.fr/dp/B00WHZ7AGS)
+- [Inserts for 3D printed parts](https://www.amazon.fr/dp/B0CS6YVJYD&th=1)
+- [Raspberry Pi Zero 2 W heatsink](https://www.amazon.fr/dp/B09QMBCXLB)
+
+Special tools:
+- [Large-depth cardboard puncher for the camera hole](https://www.amazon.fr/dp/B0BHQSL4PL)
 
 Custom parts:
 - Top mount 3D printed. STEP file located at `hardware/top_mount.step`
 - Bottom mount 3D printed. STEP file located at `hardware/bottom_mount.step`
 - Back panel laser cut in acrylic. DXF file located at `hardware/back_panel.dxf`
 
-Tools:
-- [Large-depth cardboard puncher for the camera hole]()
+Note: these custom parts are overfitted to the frame, Pi, screen and camera I chose. However it should be straightforward to adapt them for other sets of parts.
+
 
 ### Assembly
 
 ### Setting up a new Pi
 
-Burn a new SD card with raspbian bookworm, set raspberry local, set your wifi, activate SSH and hostname in the settings.
+Flash Raspbian Bookworm to SD card and make sure to:
+- Configure hostname
+- Configure user and password
+- Enable SSH
+- Set up WiFi credentials
 
+Next you will need to setup rotation of the screen at boot. First note the name of the display by running: 
 ```bash
 wlr-randr
 ```
-Note the name 
-
 
 Create or edit the autostart configuration file:
 
@@ -156,12 +170,11 @@ sudo nano /etc/xdg/autostart/screen-rotation.desktop
 ```
 
 Add these lines to the file:
-
 ```bash
 iniCopy[Desktop Entry]
 Type=Application
 Name=Screen Rotation
-Exec=wlr-randr --output HDMI-A-1 --transform 90
+Exec=wlr-randr --output YOUR_DISPLAY_NAME --transform 90
 Terminal=false
 Hidden=false
 X-GNOME-Autostart-enabled=true
@@ -173,13 +186,12 @@ Make the file executable:
 sudo chmod +x /etc/xdg/autostart/screen-rotation.desktop
 ```
 
+Next, configure the default display to be able to run the client in headless mode:
 ```bash
 sudo echo "export DISPLAY=:0" >> /etc/profile
 ```
 
-
-No solutions worked for the newer labwc so did the dirty but reversible thing:
-
+Next, we have to hide the cursor since we will be running the device in a kiosk mode. Sadly, I found no solutions worked for the newer Labwc window manager that ships with Bookworm, so I used this dirty but reversible trick that makes the cursor invisible:
 
 ```bash
 # Backup the original cursors
@@ -199,28 +211,33 @@ sudo reboot
 
 ### Setting up the Pi as an Access Point
 
+Upon recepetion of a device, the user will not be able to SSH into it since the device will not be connected to the local network. To make the device initially controllable without a mouse, keyboard nor touchscreen, we will make it an AP to which we can connect. We will then be able to SSH into the device.
+
+The Pi we used has a unique wireless network interface, so if we want it to be able to both act as an AP and as a client, we need to add another. That's where the dongle comes in, which is connected to the USB port. However it can't act as an AP, so we need to use it as client, and use the original Pi interface as AP.
+
 ```bash
 sudo apt update
 sudo apt install network-manager
 
+# List the interfaces, generally wlan0 is the original and wlan1 the dongle
 nmcli device status
 
-# Set up the AP
-sudo nmcli connection add type wifi ifname wlan0 con-name pablonet-2 autoconnect yes ssid "pablonet-2"
-sudo nmcli connection modify pablonet-2 802-11-wireless.mode ap
-sudo nmcli connection modify pablonet-2 802-11-wireless.band bg
-sudo nmcli connection modify pablonet-2 802-11-wireless.channel 6
-sudo nmcli connection modify pablonet-2 802-11-wireless-security.key-mgmt wpa-psk
-sudo nmcli connection modify pablonet-2 802-11-wireless-security.proto rsn
-sudo nmcli connection modify pablonet-2 802-11-wireless-security.psk "pablonet-2"
-sudo nmcli connection modify pablonet-2 ipv4.method shared
-sudo nmcli connection up pablonet-2
+# Set up the AP on wlan0
+sudo nmcli connection add type wifi ifname wlan0 con-name pablonet autoconnect yes ssid "pablonet"
+sudo nmcli connection modify pablonet 802-11-wireless.mode ap
+sudo nmcli connection modify pablonet 802-11-wireless.band bg
+sudo nmcli connection modify pablonet 802-11-wireless.channel 6
+sudo nmcli connection modify pablonet 802-11-wireless-security.key-mgmt wpa-psk
+sudo nmcli connection modify pablonet 802-11-wireless-security.proto rsn
+sudo nmcli connection modify pablonet 802-11-wireless-security.psk "pablonet"
+sudo nmcli connection modify pablonet ipv4.method shared
+sudo nmcli connection up pablonet
 
 # Verify the connection is active
 nmcli connection show --active
 
-# Increase priority
-sudo nmcli connection modify pablonet-2 connection.autoconnect-priority 100
+# Increase priority to maintain the AP on wlan0 at reboot
+sudo nmcli connection modify pablonet connection.autoconnect-priority 100
 ```
 
 ### Setting up the client

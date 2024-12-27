@@ -18,7 +18,7 @@ async def capture_and_send(
     fullscreen=False,
     crop_size=256,
     crop_offset_y=0,
-    compression=90,
+    jpeg_quality=90,
     rotation=0,
     target_fps=30,
 ):
@@ -126,7 +126,7 @@ async def capture_and_send(
 
             # Encode frame
             t_start = time.time()
-            compression_params = [int(cv2.IMWRITE_JPEG_QUALITY), compression]
+            compression_params = [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality]
             result, buffer = cv2.imencode(".jpg", frame, compression_params)
             encode_time = time.time() - t_start
 
@@ -257,7 +257,7 @@ if __name__ == "__main__":
         help="Offset of the crop from the top of the image",
     )
     parser.add_argument(
-        "--compression", type=int, default=90, help="JPEG compression quality"
+        "--jpeg_quality", type=int, default=90, help="JPEG compression quality"
     )
     parser.add_argument(
         "--rotation",
@@ -280,7 +280,7 @@ if __name__ == "__main__":
             args.fullscreen,
             args.crop_size,
             args.crop_offset_y,
-            args.compression,
+            args.jpeg_quality,
             args.rotation,
             args.target_fps,
         )
