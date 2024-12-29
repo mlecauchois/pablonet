@@ -4,10 +4,12 @@ import numpy as np
 from PIL import Image
 import tkinter as tk
 import json
-import io
+import os
 import cv2
 from picamera2 import Picamera2
 import time
+
+os.environ["DISPLAY"] = ":0"
 
 
 async def capture_and_send(
