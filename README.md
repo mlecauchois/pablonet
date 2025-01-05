@@ -41,7 +41,7 @@ A simple Docker image is released containing all the required packages and code:
 
 **RunPod Deployment**
 
-Here are the steps to setup a server on [RunPod](https://www.runpod.io/) specifically, which should be doable in under 10 minutes.
+Here are the steps to setup a server on [RunPod](https://www.runpod.io/) specifically, which should be doable in under 10 minutes. In case you are new to RunPod, I recorded a small video tutorial [here](https://youtu.be/aw6C6D4pC9c).
 
 - Add your SSH public key to access your pods (tutorial [here](https://docs.runpod.io/pods/configuration/use-ssh)).
 - Create a persistent storage volume in order to cache the TensorRT engine, which is GPU-specific.
