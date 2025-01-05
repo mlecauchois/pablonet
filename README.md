@@ -155,18 +155,12 @@ Custom parts:
 - Bottom mount 3D printed. STEP file located at `hardware/bottom_mount.step`
 - Back panel laser cut in acrylic. DXF file located at `hardware/back_panel.dxf`
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-    <div style="text-align: center;">                
-        <div class="image-container" style="flex: 1; text-align: center; margin-top: 20px">
-            <img src="/assets/back.jpg" style="max-width: 80%;">
-        </div>
-    </div>
-    <div style="text-align: center;">
-         <div class="image-container" style="flex: 1; text-align: center; margin-top: 20px">
-            <img src="/assets/panel.jpg" style="max-width: 80%;">
-        </div>
-    </div>
-</div>
+
+<p>
+  <img src="/assets/back.jpg" width="250" style="margin: 0 20px;" />
+  <img src="/assets/panel.jpg" width="250" style="margin: 0 20px;" />
+</p>
+
 
 You will need M2.5 screws and nuts for everything, except for the camera mounting which requires M2 screws and nuts. You will also need a soldering iron to fit the threaded inserts.
 
