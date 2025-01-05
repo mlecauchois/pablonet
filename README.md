@@ -1,6 +1,5 @@
 # PabloNet
 
-
 ## Overview
 
 <div class="image-container" style="flex: 1; text-align: left">
@@ -259,3 +258,7 @@ sudo apt install python3-pip python3-dev python3-tk python3-opencv python3-picam
 
 git clone https://github.com/mlecauchois/pablonet.git
 ```
+
+## Disclaimer
+
+Please see the [Disclaimer](DISCLAIMER.md) for legal information.
