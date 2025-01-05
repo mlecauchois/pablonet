@@ -7,7 +7,7 @@
     <img src="frame.png"  width="200">
 </div>
 
-PabloNet is a real-time AI art frame consisting of a display with an integrated camera that performs diffusion on captured images through a remote GPU server. For purchasing information and technical insights, please visit our [blogpost](https://mlecauchois.github.io/posts/pablonet/).
+PabloNet is a real-time AI art frame consisting of a display with an integrated camera that performs diffusion on captured images through a remote GPU server. For purchasing information, please visit the [blogpost](https://mlecauchois.github.io/posts/pablonet/). You can also make one yourself by following the recipe at the end of this page.
 
 ## Quick Start Guide
 
@@ -15,18 +15,17 @@ Complete setup should take under 20 minutes.
 
 ### Device SSH access
 
-Upon receiving your device:
--  The device comes pre-configured with an access point named `pablonet`.
-- Connect to this AP using password `pablonet`.
-- SSH into the device:
+Upon receiving a device:
+- The device comes pre-configured with an access point named `pablonet`. Connect to this AP using default temporary password `pablonet`.
+- SSH into the device with default temporary password `pi1234` (change that password after successfully connecting):
 ```bash
-ssh pablonet@raspberrypi.local
+ssh pi@raspberrypi.local
 ```
 - Connect the device to your local WiFi network to enable internet access:
 ```bash
 sudo nmcli device wifi connect "Your_Internet_SSID" password "Your_Password" ifname wlan1
 ```
-- From now on, you can SSH into the device both from the device's AP or your WiFi network.
+- From now on, you can SSH into the device both from the device's AP or your WiFi.
 - Test internet access on the device:
 ```bash
 ping google.com
@@ -35,23 +34,24 @@ ping google.com
 
 ### GPU server setup
 
-Currently, the device is not able to do inference. I use a non-distilled Stable Diffusion under the hood which would not be able to run on a Pi. Until the model is distilled and a Jetson is added to future devices, it is necessary to setup a remote GPU server.
+Currently, the device is not able to do inference. A non-distilled Stable Diffusion is used under the hood which would not be able to run on a Pi. Until the model is distilled and a Jetson is added to future devices, it is necessary to setup a remote GPU server.
 
 **Custom Deployment**
 
-I released a simple Docker image containing all the required packages and code: [matthieulc/pablonet:latest](https://hub.docker.com/r/matthieulc/pablonet). You can use the container serving service of your choice.
+A simple Docker image is released containing all the required packages and code: [matthieulc/pablonet:latest](https://hub.docker.com/r/matthieulc/pablonet). You can use the container serving service of your choice.
 
 **RunPod Deployment**
 
-Here are the steps to setup a server on RunPod specifically, which should be doable in under 10 minutes.
+Here are the steps to setup a server on [RunPod](https://www.runpod.io/) specifically, which should be doable in under 10 minutes.
 
+- Add your SSH public key to access your pods (tutorial [here](https://docs.runpod.io/pods/configuration/use-ssh)).
 - Create a persistent storage volume in order to cache the TensorRT engine, which is GPU-specific.
-- Create a new pod with the following template (I also created a public template [here](https://runpod.io/console/deploy?template=d3d1n13nhd&ref=hftrdy9e)):
+- Deploy a new pod for this volume with the following template (a public template for PabloNet is also made available [here](https://runpod.io/console/deploy?template=d3d1n13nhd&ref=hftrdy9e)):
     - GPU: RTX 4090 (recommended).
     - Volume: Mount your persistent storage at `/pablonet/engines`.
     - Docker Image: [matthieulc/pablonet:latest](https://hub.docker.com/r/matthieulc/pablonet).
     - Exposed Ports: 22 for SSH and 6000 for the backend.
-    - Add your SSH public key to access the server.
+    
 - Access the pod:
 ```bash
 ssh -p <pod_ssh_port> root@ssh.runpod.io
@@ -80,7 +80,7 @@ Note: The container's entrypoint script handles SSH setup and environment config
 
 SSH into your device after following the internet access steps above:
 ```bash
-ssh pablonet@raspberrypi.local
+ssh pi@raspberrypi.local
 ```
 
 Launch the client wth the default parameters:
@@ -91,10 +91,12 @@ python pablonet/client_pi.py --prompt "painting in the style of pablo picasso, c
                              --fullscreen \
                              --crop_size 900 \
                              --crop_offset_y 40 \
-                             --jpeg_quality 50 \
+                             --jpeg_quality 70 \
                              --rotation 270 \
-                             --target_fps 10
+                             --target_fps 4
 ```
+
+The client should take ~30s to start.
 
 ### Performance
 
@@ -104,16 +106,25 @@ With an RTX 4090 GPU and a good internet connection, these are the FPS ranges yo
 
 Below these FPS, the quality of the experience will be degraded and you should investigate potential network latency issues, or improper GPU setup. Typically, you should make sure that the TensorRT engine is properly re-compiled for your GPU.
 
-### Debugging Client
+### Debugging
 
-You can setup a client on your computer using your webcam:
+You can setup a client on your computer using your webcam to make debugging the server easier:
 
 ```bash
 python pablonet/client.py --prompt "painting in the style of pablo picasso, cubism, sharp high quality painting, oil painting, mute colors red yellow orange, background of green, color explosion, abstract surrealism" \
                           --image_size 150 \
                           --url ws://URL \
                           --jpeg_quality 70 \
-                          --target_fps 10
+                          --target_fps 4
+```
+
+Make sure the power brick you use supplies enough power for both the Pi and screen, otherwise the device might not be able to boot up:
+- Pi power supply requirements: 5 V 2.5 A
+- Screen power supply requirements: 5 V 2 A
+
+If you are connected to the Pi's network but sshing to the Pi via `ssh pi@raspberrypi.local` does not work, try rebooting it. Else, find out its IP adress via something like:
+```bash
+nmap -sn 192.168.1.0/24 
 ```
 
 ## Building Your Own Device
@@ -126,7 +137,7 @@ Purchased parts:
 - [Raspberry Pi Zero 2 W](https://www.amazon.fr/dp/B09KLVX4RT)
 - [10.1" Pi screen](https://www.amazon.fr/HMTECH-Raspberry-Moniteur-portable-Raspbian/dp/B098762GVK)
 - [Black frame with enough depth to fit the electronics](https://www.leroymerlin.fr/produits/decoration-eclairage/decoration-murale/cadre-photo/cadre-noir/cadre-milo-21-x-29-7-cm-noir-inspire-71670942.html)
-- [Infrared Pi camera for in-the-dark visuals](https://www.raspberrypi.com/products/pi-noir-camera-v2/)
+- [Infrared Pi camera for in-the-dark visuals](https://www.kubii.com/en/cameras-sensors/3879-1691-infrared-camera-module-v3-raspberry-pi-3272496313682.html#/angle-standard_75)
 - [Infrared light for in-the-dark visuals](https://www.amazon.fr/dp/B0BG5HM2Q8)
 - [WiFi dongle](https://www.amazon.fr/dp/B008IFXQFU)
 - [USB to Micro USB adapter for WiFi dongle](https://www.amazon.fr/dp/B09CV12BBZ)
@@ -158,6 +169,8 @@ Flash Raspbian Bookworm to SD card and make sure to:
 - Enable SSH
 - Set up WiFi credentials
 
+You can then power up the Pi with the flashed SD card.
+
 Next you will need to setup rotation of the screen at boot. First note the name of the display by running: 
 ```bash
 wlr-randr
@@ -172,7 +185,7 @@ sudo nano /etc/xdg/autostart/screen-rotation.desktop
 
 Add these lines to the file:
 ```bash
-iniCopy[Desktop Entry]
+[Desktop Entry]
 Type=Application
 Name=Screen Rotation
 Exec=wlr-randr --output YOUR_DISPLAY_NAME --transform 90
@@ -185,11 +198,6 @@ Make the file executable:
 
 ```bash
 sudo chmod +x /etc/xdg/autostart/screen-rotation.desktop
-```
-
-Next, configure the default display to be able to run the client in headless mode:
-```bash
-sudo echo "export DISPLAY=:0" >> /etc/profile
 ```
 
 Next, we have to hide the cursor since we will be running the device in a kiosk mode. Sadly, I found no solutions worked for the newer Labwc window manager that ships with Bookworm, so I used this dirty but reversible trick that makes the cursor invisible:
@@ -205,7 +213,7 @@ wget -O ~/.icons/inviscursor-theme/cursors/left_ptr https://raw.githubuserconten
 
 # Move them to default cursor location
 sudo cp ~/.icons/inviscursor-theme/cursors/left_ptr /usr/share/icons/PiXflat/cursors/left_ptr
-sudo cp ~/.icons/inviscursor-theme/cursors/left_ptr /usr/share/icons/PiXflat/cursors/left_ptr
+sudo cp ~/.icons/inviscursor-theme/cursors/left_ptr /usr/share/icons/Adwaita/cursors/left_ptr
 
 sudo reboot
 ```
@@ -214,7 +222,7 @@ sudo reboot
 
 Upon recepetion of a device, the user will not be able to SSH into it since the device will not be connected to the local network. To make the device initially controllable without a mouse, keyboard nor touchscreen, we will make it an AP to which we can connect. We will then be able to SSH into the device.
 
-The Pi we used has a unique wireless network interface, so if we want it to be able to both act as an AP and as a client, we need to add another. That's where the dongle comes in, which is connected to the USB port. However it can't act as an AP, so we need to use it as client, and use the original Pi interface as AP.
+The Pi used has a unique wireless network interface, so if we want it to be able to both act as an AP and as a client, we need to add another. That's where the dongle comes in, which is connected to the USB port. However it can't act as an AP, so we need to use it as client, and use the original Pi interface as AP.
 
 ```bash
 sudo apt update
