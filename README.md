@@ -3,7 +3,7 @@
 ## Overview
 
 <div class="image-container" style="flex: 1; text-align: left">
-    <img src="frame.png"  width="200">
+    <img src="assets/frame.png"  width="200">
 </div>
 
 PabloNet is a real-time AI art frame consisting of a display with an integrated camera that performs diffusion on captured images through a remote GPU server. For purchasing information, please visit the [blogpost](https://mlecauchois.github.io/posts/pablonet/). You can also make one yourself by following the recipe at the end of this page.
@@ -155,8 +155,22 @@ Custom parts:
 - Bottom mount 3D printed. STEP file located at `hardware/bottom_mount.step`
 - Back panel laser cut in acrylic. DXF file located at `hardware/back_panel.dxf`
 
-Note: these custom parts are overfitted to the frame, Pi, screen and camera I chose. However it should be straightforward to adapt them for other sets of parts.
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+    <div style="text-align: center;">                
+        <div class="image-container" style="flex: 1; text-align: center; margin-top: 20px">
+            <img src="/assets/back.jpg" style="max-width: 80%;">
+        </div>
+    </div>
+    <div style="text-align: center;">
+         <div class="image-container" style="flex: 1; text-align: center; margin-top: 20px">
+            <img src="/assets/panel.jpg" style="max-width: 80%;">
+        </div>
+    </div>
+</div>
 
+You will need M2.5 screws and nuts for everything, except for the camera mounting which requires M2 screws and nuts. You will also need a soldering iron to fit the threaded inserts.
+
+Note: these custom parts are overfitted to the frame, Pi, screen and camera I chose. However it should be straightforward to adapt them for other sets of parts.
 
 ### Assembly
 
