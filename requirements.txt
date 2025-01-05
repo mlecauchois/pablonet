@@ -1,11 +1,8 @@
-fire
-opencv-python
+fire==0.7.0
+opencv-python==4.10.0.84
 numpy==1.26.4
-websockets
-torch==2.1.0
-diffusers
-Pillow
-torchvision==0.16.0
-websockets
-streamdiffusion[tensorrt]
+diffusers==0.24.0
+Pillow==10.0.1
+websockets==13.1
+streamdiffusion[tensorrt]==0.1.1
 huggingface_hub==0.24.7
