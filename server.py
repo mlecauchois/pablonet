@@ -39,6 +39,7 @@ def load_model(
     print(f"Stream initialization time: {time.time() - t_start:.4f}s")
 
     t_start = time.time()
+    stream.enable_similar_image_filter(0.99, 5)
     stream.load_lcm_lora()
     stream.fuse_lora()
     print(f"LCM LoRA setup time: {time.time() - t_start:.4f}s")
