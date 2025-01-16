@@ -250,6 +250,12 @@ if __name__ == "__main__":
         help="Negative prompt to send to server",
         default="low quality",
     )
+    parser.add_argument(
+        "--camera_width", type=int, default=1400, help="Width of camera capture"
+    )
+    parser.add_argument(
+        "--camera_height", type=int, default=1000, help="Height of camera capture"
+    )
     parser.add_argument("--image_size", type=int, help="Image size", default=256)
     parser.add_argument(
         "--fullscreen", action="store_true", help="Display window in fullscreen mode"
@@ -275,12 +281,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--target_fps", type=int, default=30, help="Target FPS for frame capture"
     )
-    parser.add_argument(
-        "--camera_width", type=int, default=1400, help="Width of camera capture"
-    )
-    parser.add_argument(
-        "--camera_height", type=int, default=1000, help="Height of camera capture"
-    )
 
     args = parser.parse_args()
 
@@ -289,6 +289,8 @@ if __name__ == "__main__":
             args.url,
             args.prompt,
             args.negative_prompt,
+            args.camera_width,
+            args.camera_height,
             args.image_size,
             args.fullscreen,
             args.crop_size,
@@ -296,7 +298,5 @@ if __name__ == "__main__":
             args.jpeg_quality,
             args.rotation,
             args.target_fps,
-            args.camera_width,
-            args.camera_height,
         )
     )
