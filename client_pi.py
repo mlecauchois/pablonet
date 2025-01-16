@@ -17,6 +17,8 @@ async def capture_and_send(
     url,
     prompt,
     negative_prompt,
+    camera_width=1400,
+    camera_height=1000,
     image_size=256,
     fullscreen=False,
     crop_size=256,
@@ -31,7 +33,9 @@ async def capture_and_send(
         t_start = time.time()
         picam2 = Picamera2()
         picam2.configure(
-            picam2.create_preview_configuration(main={"size": (1400, 1000)})
+            picam2.create_preview_configuration(
+                main={"size": (camera_width, camera_height)}
+            )
         )
         print("Camera init time:", time.time() - t_start)
 
@@ -246,6 +250,12 @@ if __name__ == "__main__":
         help="Negative prompt to send to server",
         default="low quality",
     )
+    parser.add_argument(
+        "--camera_width", type=int, default=1400, help="Width of camera capture"
+    )
+    parser.add_argument(
+        "--camera_height", type=int, default=1000, help="Height of camera capture"
+    )
     parser.add_argument("--image_size", type=int, help="Image size", default=256)
     parser.add_argument(
         "--fullscreen", action="store_true", help="Display window in fullscreen mode"
@@ -279,6 +289,8 @@ if __name__ == "__main__":
             args.url,
             args.prompt,
             args.negative_prompt,
+            args.camera_width,
+            args.camera_height,
             args.image_size,
             args.fullscreen,
             args.crop_size,

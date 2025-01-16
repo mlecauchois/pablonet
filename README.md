@@ -16,7 +16,7 @@ Complete setup should take under 20 minutes.
 
 Upon receiving a device:
 - The device comes pre-configured with an access point named `pablonet`. Connect to this AP using default temporary password `pablonet`.
-- SSH into the device with default temporary password `pi1234` (change that password after successfully connecting):
+- SSH into the device with default temporary password `pi1234` (change that password after successfully connecting). If you can't connect, try rebooting the device.
 ```bash
 ssh pi@raspberrypi.local
 ```
@@ -89,10 +89,12 @@ python pablonet/client_pi.py --prompt "painting in the style of pablo picasso, c
                              --url ws://URL \
                              --fullscreen \
                              --crop_size 900 \
-                             --crop_offset_y 40 \
-                             --jpeg_quality 70 \
+                             --camera_width 900 \
+                             --camera_height 900 \
+                             --crop_offset_y 0 \
+                             --jpeg_quality 90 \
                              --rotation 270 \
-                             --target_fps 4
+                             --target_fps 20
 ```
 
 The client should take ~30s to start.
@@ -101,9 +103,9 @@ The client should take ~30s to start.
 
 With an RTX 4090 GPU and a good internet connection, these are the FPS ranges you should get:
 - Server side FPS: 15-25
-- Device FPS: 2-9
+- Device FPS: 8-15
 
-Below these FPS, the quality of the experience will be degraded and you should investigate potential network latency issues, or improper GPU setup. Typically, you should make sure that the TensorRT engine is properly re-compiled for your GPU.
+Below these FPS, the quality of the experience will be degraded and you should investigate potential network latency issues, proximity of the device to your WiFi, proximity of the server to your region, or improper GPU setup. Typically, you should make sure that the TensorRT engine is properly re-compiled for your GPU.
 
 ### Debugging
 
@@ -113,8 +115,8 @@ You can setup a client on your computer using your webcam to make debugging the 
 python pablonet/client.py --prompt "painting in the style of pablo picasso, cubism, sharp high quality painting, oil painting, mute colors red yellow orange, background of green, color explosion, abstract surrealism" \
                           --image_size 150 \
                           --url ws://URL \
-                          --jpeg_quality 70 \
-                          --target_fps 4
+                          --jpeg_quality 90 \
+                          --target_fps 20
 ```
 
 Make sure the power brick you use supplies enough power for both the Pi and screen, otherwise the device might not be able to boot up:
