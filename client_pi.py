@@ -30,9 +30,7 @@ async def capture_and_send(
         # Initialize picamera2
         t_start = time.time()
         picam2 = Picamera2()
-        picam2.configure(
-            picam2.create_preview_configuration(main={"size": (1400, 1000)})
-        )
+        picam2.configure(picam2.create_preview_configuration(main={"size": (640, 480)}))
         print("Camera init time:", time.time() - t_start)
 
         print("Starting picamera2...")
