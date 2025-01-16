@@ -17,6 +17,8 @@ async def capture_and_send(
     url,
     prompt,
     negative_prompt,
+    camera_width=1400,
+    camera_height=1000,
     image_size=256,
     fullscreen=False,
     crop_size=256,
@@ -24,7 +26,6 @@ async def capture_and_send(
     jpeg_quality=90,
     rotation=0,
     target_fps=30,
-    capture_size=(640, 480),
 ):
     uri = url
     async with websockets.connect(uri) as websocket:
@@ -32,7 +33,9 @@ async def capture_and_send(
         t_start = time.time()
         picam2 = Picamera2()
         picam2.configure(
-            picam2.create_preview_configuration(main={"size": capture_size})
+            picam2.create_preview_configuration(
+                main={"size": (camera_width, camera_height)}
+            )
         )
         print("Camera init time:", time.time() - t_start)
 
